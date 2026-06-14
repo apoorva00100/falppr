@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { env } from "../config/env.js";
 import { retrieveRelevantChunks } from "./retriever.js";
 import { buildAnswerPrompt } from "./prompt.js";
@@ -22,25 +23,40 @@ export async function answerQuestion(message, filters) {
     snippet: createSnippet(chunk.chunkText)
   }));
 
-  if (!env.openaiApiKey) {
+  const prompt = buildAnswerPrompt(message, chunks);
+  const systemInstruction = "Answer only from the supplied context and cite bracketed chunk numbers.";
+
+  if (env.openaiApiKey) {
+    const client = new OpenAI({ apiKey: env.openaiApiKey });
+    const completion = await client.chat.completions.create({
+      model: env.chatModel,
+      messages: [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.2
+    });
     return {
-      answer: `Based on the retrieved export data, the strongest available evidence is: ${chunks.slice(0, 3).map((chunk, index) => `[${index + 1}] ${createSnippet(chunk.chunkText)}`).join(" ")}`,
+      answer: completion.choices[0]?.message?.content || "The data is insufficient to answer that question.",
       citations
     };
   }
 
-  const client = new OpenAI({ apiKey: env.openaiApiKey });
-  const completion = await client.chat.completions.create({
-    model: env.chatModel,
-    messages: [
-      { role: "system", content: "Answer only from the supplied context and cite bracketed chunk numbers." },
-      { role: "user", content: buildAnswerPrompt(message, chunks) }
-    ],
-    temperature: 0.2
-  });
+  if (env.geminiApiKey) {
+    const client = new GoogleGenAI({ apiKey: env.geminiApiKey });
+    const result = await client.models.generateContent({
+      model: env.chatModel || "gemini-2.0-flash",
+      contents: prompt,
+      config: { systemInstruction, temperature: 0.2 }
+    });
+    return {
+      answer: result.text || "The data is insufficient to answer that question.",
+      citations
+    };
+  }
 
   return {
-    answer: completion.choices[0]?.message?.content || "The data is insufficient to answer that question.",
+    answer: `Based on the retrieved export data, the strongest available evidence is: ${chunks.slice(0, 3).map((chunk, index) => `[${index + 1}] ${createSnippet(chunk.chunkText)}`).join(" ")}`,
     citations
   };
 }

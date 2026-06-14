@@ -1,10 +1,14 @@
 import { env } from "../config/env.js";
 import { OpenAIEmbeddingProvider } from "./openAIEmbeddingProvider.js";
+import { GeminiEmbeddingProvider } from "./geminiEmbeddingProvider.js";
 import { sha256 } from "../ingestion/hashing.js";
 
 export function createEmbeddingProvider() {
   if (env.openaiApiKey) {
     return new OpenAIEmbeddingProvider();
+  }
+  if (env.geminiApiKey) {
+    return new GeminiEmbeddingProvider();
   }
   return new LocalEmbeddingProvider();
 }

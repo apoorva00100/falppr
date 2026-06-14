@@ -8,6 +8,7 @@ export const env = {
   qdrantCollection: process.env.QDRANT_COLLECTION || "social_chunks",
   vectorStore: process.env.VECTOR_STORE || "qdrant",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
-  embeddingModel: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
-  chatModel: process.env.CHAT_MODEL || "gpt-4.1-mini"
+  geminiApiKey: process.env.GEMINI_API_KEY || "",
+  embeddingModel: process.env.EMBEDDING_MODEL || "text-embedding-004",
+  chatModel: process.env.CHAT_MODEL || "gemini-2.0-flash"
 };
