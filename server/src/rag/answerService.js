@@ -1,0 +1,51 @@
+import OpenAI from "openai";
+import { env } from "../config/env.js";
+import { retrieveRelevantChunks } from "./retriever.js";
+import { buildAnswerPrompt } from "./prompt.js";
+
+export async function answerQuestion(message, filters) {
+  const chunks = await retrieveRelevantChunks(message, filters);
+  if (!chunks.length) {
+    return {
+      answer: "The ingested data is insufficient to answer that question.",
+      citations: []
+    };
+  }
+
+  const citations = chunks.map((chunk, index) => ({
+    id: `citation-${index + 1}`,
+    platform: chunk.platform,
+    documentType: chunk.documentType,
+    createdAt: chunk.createdAt,
+    sourceFile: chunk.sourceFile,
+    url: chunk.url,
+    snippet: createSnippet(chunk.chunkText)
+  }));
+
+  if (!env.openaiApiKey) {
+    return {
+      answer: `Based on the retrieved export data, the strongest available evidence is: ${chunks.slice(0, 3).map((chunk, index) => `[${index + 1}] ${createSnippet(chunk.chunkText)}`).join(" ")}`,
+      citations
+    };
+  }
+
+  const client = new OpenAI({ apiKey: env.openaiApiKey });
+  const completion = await client.chat.completions.create({
+    model: env.chatModel,
+    messages: [
+      { role: "system", content: "Answer only from the supplied context and cite bracketed chunk numbers." },
+      { role: "user", content: buildAnswerPrompt(message, chunks) }
+    ],
+    temperature: 0.2
+  });
+
+  return {
+    answer: completion.choices[0]?.message?.content || "The data is insufficient to answer that question.",
+    citations
+  };
+}
+
+function createSnippet(text) {
+  const compact = String(text || "").replace(/\s+/g, " ").trim();
+  return compact.length > 240 ? `${compact.slice(0, 237)}...` : compact;
+}
