@@ -1,94 +1,330 @@
-# Social Data RAG
+# Memex
 
-Social Data RAG ingests personal social media exports, normalizes authored text, embeds semantic chunks, stores them in Qdrant, and answers questions with citations from the source data. The most important architecture decisions are the parser registry, which keeps platform-specific export weirdness isolated; a single unified document and chunk schema, which keeps ingestion and retrieval platform-agnostic; and content-hash deduplication before embedding, which makes repeated imports cheaper.
+> *Ask yourself what you've been up to for 5 years.*
 
-At 10x data volume, the first bottleneck is the embedding pipeline and vector-store existence checks. Large exports increase parsing time, but embedding is usually the slowest and most expensive step. Qdrant can handle far more than a small demo, but repeated per-chunk duplicate checks would become a pressure point and should move toward batched hash lookups or a separate local metadata index.
+Memex is a personal knowledge base that ingests your social media exports and lets you have a conversation with them. Upload your LinkedIn posts, Twitter/X archive, or Instagram data — then ask questions and get grounded, cited answers pulled from your own words.
 
-To stay inside a 4 to 6 hour build window, this version cuts authentication, multi-user isolation, persistent background jobs, streaming chat responses, advanced reranking, OCR, and image/video understanding. The next things to build would be a durable import job table, progress events, richer parser fixtures, better JSON streaming for large archive files, and a reranker once the core retrieval path is stable.
+---
 
-To make the architecture 10x better, imports would move into a queue-backed worker, duplicate tracking would use a durable metadata database, parser coverage would be test-fixture driven, and retrieval would add hybrid search plus reranking. For production use, the app would also need accounts, authorization, encrypted export storage, observability, and a clear data deletion story.
+## Features
 
-## Stack
+- **Multi-platform import** — LinkedIn (CSV), Twitter/X (JSON), Instagram (JSON/HTML)
+- **Semantic search** — vector embeddings over your own content, not keyword matching
+- **Cited answers** — every response links back to the exact post, tweet, or caption it came from
+- **Content-hash deduplication** — identical chunks are never re-embedded, even across multiple imports
+- **Pluggable LLMs** — Groq, OpenAI, Gemini with automatic priority fallback
+- **Pluggable embeddings** — OpenAI, Gemini, or a local deterministic fallback that needs no API key
+- **Dev-friendly** — in-memory vector store works out of the box; Qdrant for production
+- **Chat history** — Library tab stores every Q&A session, grouped by date with expandable citations
+- **Dark UI** — black and orange theme with a cursor-following gradient glow
 
-- `client/`: React + Vite upload and chat UI.
-- `server/`: Node.js + Express ingestion, vector, and RAG API.
-- Vector store: Qdrant.
-- Embeddings/chat: OpenAI when `OPENAI_API_KEY` is set, deterministic local fallbacks otherwise.
+---
 
-## Setup
+## Overview
 
-Install dependencies:
+Social media archives are a goldmine of personal history — career milestones, opinions, creative output — but they're locked inside unstructured CSV and JSON files that nobody ever opens again.
 
-```bash
-npm install
+Memex turns those exports into a conversational knowledge base:
+
+```
+Export your data  →  Import into Memex  →  Ask anything  →  Get cited answers
 ```
 
-Start Qdrant:
+Every answer is grounded in your actual content and cites the source post so you can verify it.
+
+---
+
+## Architectural Design & Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, Tailwind CSS v4, Lucide React |
+| Backend | Node.js, Express, ES Modules |
+| Vector DB | Qdrant (production) / LocalVectorStore in-memory (development) |
+| Embeddings | OpenAI `text-embedding-3-small` · Gemini `gemini-embedding-001` · Local SHA256 deterministic (384-dim) |
+| LLM | Groq `llama-3.3-70b-versatile` · OpenAI `gpt-4.1-mini` · Gemini `gemini-2.0-flash` |
+| Parsers | `csv-parse` (streaming) · `cheerio` (HTML) · native JSON |
+| File upload | `multer` |
+| Config | `dotenv`, `cors` |
+
+### High-level Architecture
+
+```
+Browser (React SPA)
+       │
+       │  POST /api/ingest   POST /api/chat
+       ▼
+  Express Server
+       │
+  ┌────┴────────────────────────────────┐
+  │                                     │
+  Ingestion Pipeline              RAG Pipeline
+  │                                     │
+  Parser Registry                  Retriever
+  (LinkedIn / Twitter / Instagram)  (embed query → vector search)
+  │                                     │
+  Chunker + Deduplication          Answer Service
+  │                                (LLM + citations)
+  Embedding Provider               │
+  (OpenAI / Gemini / Local)        │
+  │                                 │
+  └──────────► Vector Store ◄───────┘
+               (Qdrant / Memory)
+```
+
+---
+
+## Project Structure
+
+```
+falpper/
+├── package.json              # Monorepo root (npm workspaces)
+│
+├── client/
+│   └── src/
+│       ├── main.jsx          # App shell — Chat, Import, Library pages
+│       ├── Landing.jsx       # Landing page with cursor glow effect
+│       └── styles.css        # Tailwind + custom landing CSS
+│
+└── server/
+    └── src/
+        ├── server.js         # Express entry point
+        ├── config/
+        │   └── env.js        # Centralised environment config
+        ├── routes/
+        │   ├── healthRoutes.js
+        │   ├── ingestRoutes.js
+        │   └── chatRoutes.js
+        ├── parsers/
+        │   ├── parserRegistry.js   # Routes files to the right parser
+        │   ├── BaseParser.js
+        │   ├── LinkedInParser.js
+        │   ├── TwitterParser.js
+        │   ├── InstagramParser.js
+        │   └── parserUtils.js
+        ├── ingestion/
+        │   ├── ingestService.js    # Orchestrates the full pipeline
+        │   ├── chunker.js          # Semantic text splitting
+        │   └── hashing.js          # SHA256 content hashing
+        ├── embeddings/
+        │   ├── embeddingProvider.js        # Factory — picks provider from env
+        │   ├── openAIEmbeddingProvider.js
+        │   └── geminiEmbeddingProvider.js
+        ├── vector/
+        │   ├── createVectorStore.js   # Factory — qdrant or memory
+        │   ├── qdrantClient.js
+        │   └── localVectorStore.js
+        └── rag/
+            ├── retriever.js       # Embed query + vector search
+            ├── prompt.js          # Builds the context + question prompt
+            └── answerService.js   # Calls LLM, returns answer + citations
+```
+
+---
+
+## Ingestion Pipeline
+
+When you upload files, Memex runs them through a multi-stage pipeline:
+
+```
+1. Upload (multer)
+        │
+2. Parser Registry
+   ├── LinkedInParser  (CSV with linkedin/share/post/article in filename)
+   ├── TwitterParser   (JSON with twitter/tweet/x_archive in filename)
+   └── InstagramParser (JSON or HTML with instagram in filename)
+        │
+3. Normalised Document
+   { sourceId, platform, documentType, author, content, createdAt, url }
+        │
+4. Chunker  (max 1800 chars, splits on paragraph → sentence boundaries)
+        │
+5. Deduplication
+   ├── In-memory SHA256 Set  (within this import)
+   └── Vector store lookup   (across past imports)
+        │
+6. Batch Embedding  (64 chunks / batch · 3 concurrent · exponential backoff)
+        │
+7. Upsert to Vector Store
+```
+
+All parsers implement a common async iterator interface so the chunking, dedup, and embedding stages are completely platform-agnostic.
+
+---
+
+## Vector Knowledge Base
+
+Each chunk stored in the vector store carries:
+
+| Field | Description |
+|---|---|
+| `chunkId` | SHA256(sourceId + index + contentHash) |
+| `contentHash` | SHA256(text) — used for deduplication |
+| `chunkText` | The raw text of the chunk |
+| `platform` | `linkedin` / `twitter` / `instagram` |
+| `documentType` | `post` / `tweet` / `article` / `reply` / `caption` / `profile` |
+| `sourceFile` | Original filename |
+| `url` | Link back to the original post (where available) |
+| `createdAt` | ISO 8601 timestamp |
+| `tokenEstimate` | `ceil(length / 4)` |
+
+**Qdrant (production):** cosine distance, auto-created collection, payload indexes on `platform`, `documentType`, `contentHash`, and `createdAt` for fast filtered search.
+
+**LocalVectorStore (development):** pure in-memory cosine similarity — no Docker, no setup. Resets on server restart.
+
+---
+
+## Retrieval-Augmented Generation (RAG)
+
+```
+User question
+     │
+1. Embed question  (same provider used during ingestion)
+     │
+2. Vector search   (top 6 chunks, optional platform / docType filters)
+     │
+3. Build prompt
+   ┌──────────────────────────────────────────────────────┐
+   │ System: "Answer only from the supplied context and   │
+   │          cite bracketed chunk numbers."              │
+   │                                                      │
+   │ [1] linkedin · post · 2024-03-15                     │
+   │     "Remote work changed everything for me…"         │
+   │                                                      │
+   │ [2] linkedin · article · 2023-11-02                  │
+   │     …                                                │
+   │                                                      │
+   │ Question: What does this person think about          │
+   │           remote work?                               │
+   └──────────────────────────────────────────────────────┘
+     │
+4. LLM (temperature 0.2)
+   Priority: OpenAI → Gemini → Groq (auto-fallback on quota / 429)
+     │
+5. Response  { answer: string, citations: Citation[] }
+```
+
+Citations include platform, documentType, createdAt, sourceFile, url, and a 240-character snippet.
+
+---
+
+## Efficiency Considerations
+
+| Concern | Solution |
+|---|---|
+| Large CSV files | Streaming parser via `csv-parse` — constant memory regardless of file size |
+| Re-embedding cost | Dual-layer dedup: in-memory hash Set (same import) + DB lookup (past imports) |
+| Embedding API rate limits | Batched requests: 64 chunks per batch, max 3 concurrent, retry with exponential backoff (0.5 s / 1 s / 1.5 s) |
+| Filtered vector search speed | Payload indexes on `platform`, `documentType`, `contentHash`, `createdAt` in Qdrant |
+| Zero-infrastructure dev | `VECTOR_STORE=memory` uses an in-memory cosine-similarity store — no Docker required |
+
+---
+
+## Trade-offs
+
+| Trade-off | Current behaviour | Impact |
+|---|---|---|
+| Synchronous imports | Large uploads block the HTTP request until complete | Limits practical file size; no progress streaming |
+| In-memory dev store | Resets on every server restart | Must re-import after each dev restart |
+| No auth | Single-user only; all data is in one collection | Not suitable for multi-user deployment |
+| JSON/HTML in memory | Full file loaded before parsing (unlike streaming CSV) | Memory spike on very large JSON archives |
+| No reranking | Top-6 by cosine similarity only | Occasional relevance misses on ambiguous queries |
+
+---
+
+## Future Improvements
+
+- **Async import queue** — background worker with real-time progress updates via SSE or WebSocket
+- **Persistent dedup DB** — SQLite/Postgres metadata store so dedup survives server restarts without Qdrant
+- **Hybrid search** — combine semantic (vector) with BM25 keyword scoring for better recall
+- **Reranking layer** — cross-encoder reranker on the top-20 candidates before passing to LLM
+- **Streaming chat** — stream LLM tokens to the client instead of waiting for the full response
+- **User accounts** — per-user collections with encryption at rest
+- **OCR & media** — extract text from images and video transcripts inside archives
+- **More parsers** — Medium, Substack, GitHub activity, YouTube comments
+
+---
+
+## Example Queries
+
+```
+"What does this person think about remote work?"
+"Summarize my career progression over the last 3 years."
+"What topics do I tweet about most?"
+"What articles did I share about AI in 2023?"
+"Have I ever written about burnout or mental health?"
+"What were my most engaged posts on LinkedIn?"
+"What side projects have I mentioned over the years?"
+```
+
+---
+
+## Screenshots
+
+> Add screenshots here of:
+> - Landing page (hero + mockup side by side)
+> - Chat page with a question and cited answer
+> - Library tab showing history grouped by date
+> - Import page after a successful ingest
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- A free [Groq API key](https://console.groq.com) (or OpenAI / Gemini)
+
+### Install & run
 
 ```bash
-docker run -p 6333:6333 -v qdrant_storage:/qdrant/storage qdrant/qdrant
+git clone <repo>
+cd falpper
+npm install
 ```
 
 Create `server/.env`:
 
-```text
+```env
 PORT=5000
-QDRANT_URL=http://localhost:6333
-QDRANT_COLLECTION=social_chunks
-VECTOR_STORE=qdrant
-OPENAI_API_KEY=
-EMBEDDING_MODEL=text-embedding-3-small
-CHAT_MODEL=gpt-4.1-mini
-```
-
-If Docker is not installed, use the in-process development store instead:
-
-```text
 VECTOR_STORE=memory
+GROQ_API_KEY=gsk_...
+CHAT_MODEL=llama-3.3-70b-versatile
 ```
-
-Memory mode is useful for local testing, but it resets whenever the server restarts. Qdrant is still the recommended store for persistent imports and metadata-aware retrieval.
-
-Run the app:
 
 ```bash
 npm run dev
 ```
 
-The client runs at `http://localhost:5173` and the server runs at `http://localhost:5000`.
+Opens on `http://localhost:5173`. The server runs on `http://localhost:5000`.
 
-## Example Flow
+### Production (with Qdrant)
 
-1. Export your LinkedIn, Twitter/X, or Instagram data.
-2. Open the client and upload one or more CSV, JSON, or HTML files.
-3. Review the ingestion summary for parsed documents, created chunks, skipped duplicates, and embedded chunks.
-4. Ask a question such as `What does this person think about remote work?`.
-5. Read the grounded answer and inspect citations under the assistant message.
-
-## API
-
-`GET /api/health`
-
-```json
-{ "ok": true }
+```bash
+docker run -p 6333:6333 qdrant/qdrant
 ```
 
-`POST /api/ingest`
+Update `server/.env`:
 
-Multipart form field: `files`.
-
-`POST /api/chat`
-
-```json
-{
-  "message": "What does this person think about remote work?",
-  "filters": {
-    "platform": ["linkedin", "twitter"],
-    "documentType": ["post", "tweet"]
-  }
-}
+```env
+VECTOR_STORE=qdrant
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=social_chunks
 ```
 
-## Parser Tradeoffs
+### API
 
-CSV parsing is stream-based. JSON and HTML parser modules are isolated behind the same async iterator interface, but this first version reads those uploaded files into memory because export shapes vary widely. The isolation keeps the downstream ingestion, chunking, embedding, vector, and chat code unchanged when a streaming JSON parser is added later.
+```
+GET  /api/health
+POST /api/ingest    multipart/form-data · field: "files"
+POST /api/chat      { message: string, filters?: { platform?: string[], documentType?: string[] } }
+```
+
+---
+
+## Why This Project Matters
+
+Your social media history is a detailed, timestamped record of how your thinking has evolved — your professional opinions, creative experiments, the ideas you championed and the ones you walked back. But once exported, that data sits in a zip file and is never read again.
+
+Memex changes that. It treats your archive not as a data export but as a personal knowledge base — something you can interrogate, reflect on, and learn from. It's a memory layer over your own digital footprint, powered entirely by your own words.

@@ -42,7 +42,20 @@ export async function answerQuestion(message, filters) {
   }
 
   if (env.geminiApiKey) {
-    const answer = await geminiChat(systemInstruction, prompt);
+    try {
+      const answer = await geminiChat(systemInstruction, prompt);
+      return { answer, citations };
+    } catch (err) {
+      if (env.groqApiKey && /quota|rate.?limit|429/i.test(err.message)) {
+        const answer = await groqChat(systemInstruction, prompt);
+        return { answer, citations };
+      }
+      throw err;
+    }
+  }
+
+  if (env.groqApiKey) {
+    const answer = await groqChat(systemInstruction, prompt);
     return { answer, citations };
   }
 
@@ -70,6 +83,23 @@ async function geminiChat(systemInstruction, prompt) {
   }
   const data = await response.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "The data is insufficient to answer that question.";
+}
+
+async function groqChat(systemInstruction, prompt) {
+  const client = new OpenAI({
+    apiKey: env.groqApiKey,
+    baseURL: "https://api.groq.com/openai/v1"
+  });
+  const model = env.chatModel || "llama-3.3-70b-versatile";
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: systemInstruction },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.2
+  });
+  return completion.choices[0]?.message?.content || "The data is insufficient to answer that question.";
 }
 
 function createSnippet(text) {
