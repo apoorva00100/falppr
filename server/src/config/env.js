@@ -9,6 +9,7 @@ export const env = {
   vectorStore: process.env.VECTOR_STORE || "qdrant",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
-  embeddingModel: process.env.EMBEDDING_MODEL || "text-embedding-004",
+  groqApiKey: process.env.GROQ_API_KEY || "",
+  embeddingModel: process.env.EMBEDDING_MODEL || "gemini-embedding-001",
   chatModel: process.env.CHAT_MODEL || "gemini-2.0-flash"
 };

@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
 import { env } from "../config/env.js";
 import { retrieveRelevantChunks } from "./retriever.js";
 import { buildAnswerPrompt } from "./prompt.js";
@@ -43,22 +42,34 @@ export async function answerQuestion(message, filters) {
   }
 
   if (env.geminiApiKey) {
-    const client = new GoogleGenAI({ apiKey: env.geminiApiKey });
-    const result = await client.models.generateContent({
-      model: env.chatModel || "gemini-2.0-flash",
-      contents: prompt,
-      config: { systemInstruction, temperature: 0.2 }
-    });
-    return {
-      answer: result.text || "The data is insufficient to answer that question.",
-      citations
-    };
+    const answer = await geminiChat(systemInstruction, prompt);
+    return { answer, citations };
   }
 
   return {
     answer: `Based on the retrieved export data, the strongest available evidence is: ${chunks.slice(0, 3).map((chunk, index) => `[${index + 1}] ${createSnippet(chunk.chunkText)}`).join(" ")}`,
     citations
   };
+}
+
+async function geminiChat(systemInstruction, prompt) {
+  const model = env.chatModel || "gemini-2.0-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.geminiApiKey}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemInstruction }] },
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2 }
+    })
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error?.error?.message || `Gemini chat failed: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "The data is insufficient to answer that question.";
 }
 
 function createSnippet(text) {

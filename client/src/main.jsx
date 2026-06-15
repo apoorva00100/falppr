@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { MessageSquare, Send, Upload, FileText } from "lucide-react";
+import { Landing } from "./Landing.jsx";
 import "./styles.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
@@ -228,4 +229,16 @@ function compactFilters(filters) {
   return Object.fromEntries(Object.entries(filters).filter(([, value]) => Array.isArray(value) && value.length));
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+function Root() {
+  const [hash, setHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  return hash === "#app" ? <App /> : <Landing />;
+}
+
+createRoot(document.getElementById("root")).render(<Root />);
