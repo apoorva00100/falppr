@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-const HEALTH_URL = `${import.meta.env.VITE_API_BASE || "http://localhost:5000"}/api/health`;
+const HEALTH_URL = (import.meta.env.VITE_API_BASE || "") + "/api/health";
 
 export function Landing() {
   const toastRef = useRef(null);

@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "description": "Social export ingestion and RAG chat app.",
   "scripts": {
+    "build": "npm run build --workspace client",
+    "start": "npm run start --workspace server",
     "dev": "concurrently \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
     "server": "npm run dev --workspace server",
     "client": "npm run dev --workspace client",

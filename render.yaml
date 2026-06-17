@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: falppr
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: VECTOR_STORE
+        value: memory
+      - key: CHAT_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_API_KEY
+        sync: false
