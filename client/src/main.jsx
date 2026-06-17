@@ -25,6 +25,8 @@ function PlatformIcon({ platform, size = 18 }) {
   if (platform === "linkedin")  return <span style={{ ...s, background: "#0a66c2", color: "#fff" }}>in</span>;
   if (platform === "twitter")   return <span style={{ ...s, background: "#1a1a1a", color: "#fff", border: "1px solid #333" }}>X</span>;
   if (platform === "instagram") return <span style={{ ...s, background: "linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", color: "#fff" }}>IG</span>;
+  if (platform === "pdf")       return <span style={{ ...s, background: "#b91c1c", color: "#fff", fontSize: size * 0.42 }}>PDF</span>;
+  if (platform === "image")     return <span style={{ ...s, background: "#f97316", color: "#fff", fontSize: size * 0.42 }}>IMG</span>;
   return <span style={{ ...s, background: "#1c1c1e", color: "#9a9a9a" }}>{(platform || "?")[0].toUpperCase()}</span>;
 }
 
@@ -105,7 +107,7 @@ function LeftSidebar({ collapsed, onCollapse, page, setPage, ingestion }) {
 
 // ── Right panel ───────────────────────────────────────────────
 function RightPanel({ citations, filters, setFilters }) {
-  const platforms = ["all", "linkedin", "twitter", "instagram"];
+  const platforms = ["all", "linkedin", "twitter", "instagram", "pdf", "image"];
   const [dateRange, setDateRange] = useState("All time");
   const [contentType, setContentType] = useState("All");
 
@@ -347,14 +349,14 @@ function ImportPage({ files, setFiles, ingestion, uploading, onIngest }) {
   return (
     <div className="flex-1 overflow-y-auto bg-[#080809] p-8">
       <h2 className="text-[18px] font-semibold text-[#f5f5f5] mb-1">Import data</h2>
-      <p className="text-[13px] text-[#9a9a9a] mb-6">Upload your social media exports to build your knowledge base.</p>
+      <p className="text-[13px] text-[#9a9a9a] mb-6">Upload your social media exports, PDFs, or images to build your knowledge base.</p>
 
       <div className="max-w-lg">
         <form onSubmit={onIngest}>
           <label className="flex flex-col items-center justify-center gap-3 min-h-[140px] border border-dashed border-[#2a2a2a] rounded-xl bg-[#141415] text-[#9a9a9a] cursor-pointer hover:border-[#f97316] hover:text-[#f97316] transition-colors mb-4">
-            <input type="file" multiple accept=".csv,.json,.html" className="hidden" onChange={e => setFiles(Array.from(e.target.files || []))} />
+            <input type="file" multiple accept=".csv,.json,.html,.pdf,.png,.jpg,.jpeg,.webp,.bmp" className="hidden" onChange={e => setFiles(Array.from(e.target.files || []))} />
             <FileText size={28} />
-            <span className="text-[13px]">{files.length ? `${files.length} file${files.length > 1 ? "s" : ""} selected` : "Choose export files (CSV, JSON, HTML)"}</span>
+            <span className="text-[13px]">{files.length ? `${files.length} file${files.length > 1 ? "s" : ""} selected` : "Choose files (CSV, JSON, HTML, PDF, Images)"}</span>
           </label>
 
           <button
@@ -536,6 +538,7 @@ function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ingestion failed");
       setIngestion(data);
+      setPage("chat");
     } catch (err) {
       setIngestion({ error: err.message });
     } finally {

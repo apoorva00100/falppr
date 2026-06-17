@@ -1,11 +1,15 @@
 import { LinkedInParser } from "./LinkedInParser.js";
 import { TwitterParser } from "./TwitterParser.js";
 import { InstagramParser } from "./InstagramParser.js";
+import { PdfParser } from "./PdfParser.js";
+import { ImageParser } from "./ImageParser.js";
 
 const parsers = [
   new LinkedInParser(),
   new TwitterParser(),
-  new InstagramParser()
+  new InstagramParser(),
+  new PdfParser(),
+  new ImageParser()
 ];
 
 export function getParserForFile(file) {
