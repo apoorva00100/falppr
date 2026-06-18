@@ -604,7 +604,7 @@ function App() {
 
 // ── Root ──────────────────────────────────────────────────────
 function Root() {
-  const [hash, setHash] = useState(window.location.hash);
+  const [hash, setHash] = useState("");
   useEffect(() => {
     const onHash = () => setHash(window.location.hash);
     window.addEventListener("hashchange", onHash);
@@ -613,4 +613,6 @@ function Root() {
   return hash === "#app" ? <App /> : <Landing />;
 }
 
+// createRoot(document.getElementById("root")).render(<Landing />);
 createRoot(document.getElementById("root")).render(<Root />);
+
