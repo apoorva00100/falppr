@@ -42,7 +42,7 @@ export class VectorStore {
     await this.ensureCollection();
     const result = await this.client.scroll(this.collection, {
       limit: 1,
-      filter: matchAny("contentHash", [contentHash]),
+      filter: { must: [matchAny("contentHash", [contentHash])] },
       with_payload: false,
       with_vector: false
     });
