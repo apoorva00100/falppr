@@ -1,6 +1,6 @@
+import "../server/src/polyfills.js"; // must be first — sets DOM globals before pdfjs-dist loads
 import app from "../server/src/app.js";
 
-// Surface any unhandled startup errors in Vercel logs
 process.on("unhandledRejection", (err) => {
   console.error("[startup] Unhandled rejection:", err);
 });
