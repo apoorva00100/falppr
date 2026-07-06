@@ -50,7 +50,13 @@ export async function ingestFiles(files) {
         }
       }
     } catch (error) {
-      summary.errors.push({ file: file.originalname, error: error.message });
+      const detail =
+        error?.data?.status?.error ||
+        error?.data?.status?.reason ||
+        (error?.data ? JSON.stringify(error.data) : null) ||
+        error.message;
+      console.error(`[ingest] Failed on ${file.originalname}:`, detail, error);
+      summary.errors.push({ file: file.originalname, error: detail });
     }
   }
 

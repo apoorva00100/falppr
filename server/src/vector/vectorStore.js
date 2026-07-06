@@ -30,7 +30,10 @@ export class VectorStore {
           field_schema: field === "createdAt" ? "datetime" : "keyword"
         });
       } catch (error) {
-        if (!String(error.message).includes("already exists")) throw error;
+        // Payload indexes are only a query-speed optimization — never fail ingest over them.
+        if (!String(error.message).includes("already exists")) {
+          console.warn(`[qdrant] Could not create payload index for "${field}":`, error?.data?.status?.error || error.message);
+        }
       }
     }
   }
