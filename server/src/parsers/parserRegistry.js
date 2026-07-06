@@ -9,7 +9,8 @@ const parsers = [
   new TwitterParser(),
   new InstagramParser(),
   new PdfParser(),
-  new ImageParser()
+  // ImageParser requires tesseract.js (@napi-rs/canvas) — skip on Vercel serverless
+  ...(process.env.VERCEL ? [] : [new ImageParser()]),
 ];
 
 export function getParserForFile(file) {
