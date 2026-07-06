@@ -2,6 +2,7 @@
   "name": "social-data-rag",
   "private": true,
   "version": "0.1.0",
+  "type": "module",
   "description": "Social export ingestion and RAG chat app.",
   "scripts": {
     "build": "npm run build --workspace client",
