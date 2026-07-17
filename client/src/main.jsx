@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { MessageSquare, Upload, Send, FileText, Library, ChevronLeft, ChevronRight, Moon, Paperclip, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Database } from "lucide-react";
+import { MessageSquare, Upload, Send, FileText, Library, ChevronLeft, ChevronRight, Moon, Paperclip, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Database, LogOut } from "lucide-react";
 import { Landing } from "./Landing.jsx";
 import "./styles.css";
 
@@ -31,7 +31,7 @@ function PlatformIcon({ platform, size = 18 }) {
 }
 
 // ── Left sidebar ─────────────────────────────────────────────
-function LeftSidebar({ collapsed, onCollapse, page, setPage, ingestion }) {
+function LeftSidebar({ collapsed, onCollapse, page, setPage, ingestion, user, onLogout }) {
   const navItems = [
     { id: "chat",    label: "Chat",    Icon: MessageSquare },
     { id: "import",  label: "Import",  Icon: Upload },
@@ -92,14 +92,24 @@ function LeftSidebar({ collapsed, onCollapse, page, setPage, ingestion }) {
 
       {/* User */}
       <div className={`flex items-center gap-2 px-3 py-3 border-t border-[#262628] ${collapsed ? "justify-center" : ""}`}>
-        <div className="w-7 h-7 rounded-full bg-[#f97316] text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">A</div>
-        {!collapsed && (
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-[#f5f5f5] truncate">Arjun Sharma</p>
-            <p className="text-[10px] text-[#4a4a4a] truncate">Local Workspace</p>
+        {user?.avatarUrl ? (
+          <img src={user.avatarUrl} alt="" className="w-7 h-7 rounded-full flex-shrink-0" />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-[#f97316] text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
+            {(user?.name || user?.login || "?")[0].toUpperCase()}
           </div>
         )}
-        {!collapsed && <Moon size={13} className="text-[#4a4a4a] flex-shrink-0" />}
+        {!collapsed && (
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-medium text-[#f5f5f5] truncate">{user?.name || user?.login}</p>
+            <p className="text-[10px] text-[#4a4a4a] truncate">@{user?.login}</p>
+          </div>
+        )}
+        {!collapsed && (
+          <button onClick={onLogout} className="text-[#4a4a4a] hover:text-[#f97316] bg-transparent border-none cursor-pointer p-0.5 flex-shrink-0" aria-label="Sign out">
+            <LogOut size={13} />
+          </button>
+        )}
       </div>
     </aside>
   );
@@ -221,7 +231,7 @@ function RightPanel({ citations, filters, setFilters }) {
 }
 
 // ── Chat main ─────────────────────────────────────────────────
-function ChatMain({ chat, asking, message, setMessage, onSend }) {
+function ChatMain({ chat, asking, message, setMessage, onSend, userName }) {
   const messagesEndRef = useRef(null);
   const [expandedSources, setExpandedSources] = useState({});
 
@@ -237,7 +247,7 @@ function ChatMain({ chat, asking, message, setMessage, onSend }) {
     <div className="flex flex-col h-full bg-[#080809]">
       {/* Header */}
       <div className="px-6 pt-6 pb-4 border-b border-[#262628]">
-        <h2 className="text-[20px] font-semibold text-[#f5f5f5]">Good {greeting()}, Arjun 👋</h2>
+        <h2 className="text-[20px] font-semibold text-[#f5f5f5]">Good {greeting()}, {userName} 👋</h2>
         <p className="text-[13px] text-[#4a4a4a] mt-0.5">Ask yourself what you've been up to for 5 years.</p>
       </div>
 
@@ -504,8 +514,9 @@ function PlaceholderPage({ icon: Icon, title }) {
 }
 
 // ── App ───────────────────────────────────────────────────────
-function App() {
+function App({ user, onLogout }) {
   const [page, setPage] = useState("chat");
+  const userName = user?.name?.split(" ")[0] || user?.login || "there";
 
   useEffect(() => {
     function onMouseMove(e) {
@@ -575,7 +586,7 @@ function App() {
   }
 
   const mainContent = () => {
-    if (page === "chat")      return <ChatMain chat={chat} asking={asking} message={message} setMessage={setMessage} onSend={handleSend} />;
+    if (page === "chat")      return <ChatMain chat={chat} asking={asking} message={message} setMessage={setMessage} onSend={handleSend} userName={userName} />;
     if (page === "import")    return <ImportPage files={files} setFiles={setFiles} ingestion={ingestion} uploading={uploading} onIngest={handleIngest} />;
     if (page === "library")   return <LibraryPage history={history} />;
   };
@@ -593,6 +604,8 @@ function App() {
         page={page}
         setPage={setPage}
         ingestion={ingestion}
+        user={user}
+        onLogout={onLogout}
       />
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {mainContent()}
@@ -603,14 +616,44 @@ function App() {
 }
 
 // ── Root ──────────────────────────────────────────────────────
+function useSession() {
+  const [status, setStatus] = useState("loading"); // loading | authed | anon
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/auth/me`)
+      .then(res => (res.ok ? res.json() : Promise.reject()))
+      .then(data => { setUser(data.user); setStatus("authed"); })
+      .catch(() => setStatus("anon"));
+  }, []);
+
+  return { status, user, setStatus };
+}
+
 function Root() {
-  const [hash, setHash] = useState("");
+  const [hash, setHash] = useState(window.location.hash);
   useEffect(() => {
     const onHash = () => setHash(window.location.hash);
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
-  return hash === "#app" ? <App /> : <Landing />;
+
+  const session = useSession();
+
+  async function handleLogout() {
+    await fetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
+    session.setStatus("anon");
+    window.location.hash = "";
+  }
+
+  if (hash !== "#app") return <Landing session={session} onLogout={handleLogout} />;
+  if (session.status === "loading") return <div className="h-screen bg-[#080809]" />;
+  if (session.status === "anon") {
+    window.location.href = `${API_BASE}/api/auth/github`;
+    return <div className="h-screen bg-[#080809]" />;
+  }
+
+  return <App user={session.user} onLogout={handleLogout} />;
 }
 
 // createRoot(document.getElementById("root")).render(<Landing />);

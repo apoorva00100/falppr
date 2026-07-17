@@ -3,8 +3,8 @@ import { env } from "../config/env.js";
 import { retrieveRelevantChunks } from "./retriever.js";
 import { buildAnswerPrompt } from "./prompt.js";
 
-export async function answerQuestion(message, filters) {
-  const chunks = await retrieveRelevantChunks(message, filters);
+export async function answerQuestion(message, filters, userId) {
+  const chunks = await retrieveRelevantChunks(message, filters, userId);
   if (!chunks.length) {
     return {
       answer: "The ingested data is insufficient to answer that question.",

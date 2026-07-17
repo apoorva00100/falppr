@@ -12,5 +12,10 @@ export const env = {
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   groqApiKey: process.env.GROQ_API_KEY || "",
   embeddingModel: process.env.EMBEDDING_MODEL || "gemini-embedding-001",
-  chatModel: process.env.CHAT_MODEL || "gemini-2.0-flash"
+  chatModel: process.env.CHAT_MODEL || "gemini-2.0-flash",
+  githubClientId: process.env.GITHUB_CLIENT_ID || "",
+  githubClientSecret: process.env.GITHUB_CLIENT_SECRET || "",
+  githubCallbackUrl: process.env.GITHUB_CALLBACK_URL || "http://localhost:5000/api/auth/github/callback",
+  sessionSecret: process.env.SESSION_SECRET || "",
+  isProduction: process.env.NODE_ENV === "production"
 };

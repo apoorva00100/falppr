@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from "react";
 
-const HEALTH_URL = (import.meta.env.VITE_API_BASE || "") + "/api/health";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+const HEALTH_URL = API_BASE + "/api/health";
 
-export function Landing() {
+export function Landing({ session, onLogout }) {
   const toastRef = useRef(null);
   const botWrapRef = useRef(null);
   const thinkingRef = useRef(null);
@@ -36,6 +37,10 @@ export function Landing() {
   }, []);
 
   async function handleCta() {
+    if (session?.status === "anon") {
+      window.location.href = `${API_BASE}/api/auth/github`;
+      return;
+    }
     try {
       const res = await fetch(HEALTH_URL, { signal: AbortSignal.timeout(2000) });
       if (res.ok) { window.location.hash = "app"; return; }
@@ -53,6 +58,30 @@ export function Landing() {
   return (
     <div className="lp-shell">
       <div className="lp-cursor-glow" aria-hidden="true" />
+
+      {/* ── corner auth ── */}
+      <div className="lp-corner-auth">
+        {session?.status === "authed" ? (
+          <>
+            {session.user.avatarUrl ? (
+              <img src={session.user.avatarUrl} alt="" className="lp-corner-avatar" />
+            ) : (
+              <span className="lp-corner-avatar lp-corner-avatar-fallback">
+                {(session.user.name || session.user.login || "?")[0].toUpperCase()}
+              </span>
+            )}
+            <span className="lp-corner-name">{session.user.name || session.user.login}</span>
+            <button className="lp-corner-signout" onClick={onLogout}>Sign out</button>
+          </>
+        ) : session?.status === "anon" ? (
+          <a href={`${API_BASE}/api/auth/github`} className="lp-corner-signin">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.1 3.29 9.4 7.86 10.94.57.1.78-.25.78-.55v-2.1c-3.2.7-3.87-1.36-3.87-1.36-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.2-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.2 1.18a11.1 11.1 0 0 1 5.82 0c2.22-1.49 3.2-1.18 3.2-1.18.63 1.59.23 2.76.11 3.05.75.81 1.2 1.84 1.2 3.1 0 4.43-2.7 5.4-5.26 5.69.42.36.78 1.08.78 2.17v3.22c0 .3.2.66.79.55A11.5 11.5 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z" />
+            </svg>
+            Sign in with GitHub
+          </a>
+        ) : null}
+      </div>
 
       {/* ── hero + mockup side by side ── */}
       <div className="lp-above-fold">

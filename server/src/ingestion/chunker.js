@@ -2,13 +2,14 @@ import { sha256 } from "./hashing.js";
 
 const MAX_CHARS = 1800;
 
-export function chunkDocument(document) {
+export function chunkDocument(document, userId) {
   const parts = semanticParts(document);
   return parts.map((text, index) => {
     const contentHash = sha256(text);
     return {
-      chunkId: sha256(`${document.sourceId}:${index}:${contentHash}`),
+      chunkId: sha256(`${userId}:${document.sourceId}:${index}:${contentHash}`),
       documentId: document.sourceId,
+      userId,
       contentHash,
       platform: document.platform,
       documentType: document.documentType,

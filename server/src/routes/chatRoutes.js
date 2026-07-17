@@ -10,7 +10,7 @@ chatRoutes.post("/", async (req, res, next) => {
       return res.status(400).json({ error: "message is required" });
     }
 
-    const response = await answerQuestion(message, filters || {});
+    const response = await answerQuestion(message, filters || {}, req.user.id);
     res.json(response);
   } catch (error) {
     next(error);

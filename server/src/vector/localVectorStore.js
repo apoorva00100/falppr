@@ -5,8 +5,8 @@ export class LocalVectorStore {
     this.dimension = dimension;
   }
 
-  async hasContentHash(contentHash) {
-    return points.some((point) => point.payload.contentHash === contentHash);
+  async hasContentHash(contentHash, userId) {
+    return points.some((point) => point.payload.userId === userId && point.payload.contentHash === contentHash);
   }
 
   async upsertChunks(chunks, vectors) {
@@ -14,6 +14,7 @@ export class LocalVectorStore {
       const payload = {
         chunkId: chunk.chunkId,
         documentId: chunk.documentId,
+        userId: chunk.userId,
         contentHash: chunk.contentHash,
         platform: chunk.platform,
         documentType: chunk.documentType,
@@ -35,9 +36,9 @@ export class LocalVectorStore {
     });
   }
 
-  async search(vector, filters = {}, limit = 6) {
+  async search(vector, filters = {}, limit = 6, userId) {
     return points
-      .filter((point) => matchesFilters(point.payload, filters))
+      .filter((point) => point.payload.userId === userId && matchesFilters(point.payload, filters))
       .map((point) => ({
         score: cosineSimilarity(vector, point.vector),
         ...point.payload

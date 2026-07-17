@@ -11,7 +11,7 @@ export const ingestRoutes = Router();
 
 ingestRoutes.post("/", upload.array("files"), async (req, res, next) => {
   try {
-    const summary = await ingestFiles(req.files || []);
+    const summary = await ingestFiles(req.files || [], req.user.id);
     res.json(summary);
   } catch (error) {
     next(error);

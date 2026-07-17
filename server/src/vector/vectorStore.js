@@ -17,13 +17,16 @@ export class VectorStore {
       await this.client.createCollection(this.collection, {
         vectors: { size: this.dimension, distance: "Cosine" }
       });
-      await this.createPayloadIndexes();
     }
+    // Always attempt to (re)create indexes — collections created before a payload
+    // field was added to the index list (e.g. "userId") won't have it otherwise,
+    // and Qdrant Cloud rejects filtering on an unindexed field.
+    await this.createPayloadIndexes();
     this.ready = true;
   }
 
   async createPayloadIndexes() {
-    for (const field of ["platform", "documentType", "createdAt", "contentHash"]) {
+    for (const field of ["userId", "platform", "documentType", "createdAt", "contentHash"]) {
       try {
         await this.client.createPayloadIndex(this.collection, {
           field_name: field,
@@ -38,11 +41,11 @@ export class VectorStore {
     }
   }
 
-  async hasContentHash(contentHash) {
+  async hasContentHash(contentHash, userId) {
     await this.ensureCollection();
     const result = await this.client.scroll(this.collection, {
       limit: 1,
-      filter: { must: [matchAny("contentHash", [contentHash])] },
+      filter: { must: [matchAny("userId", [userId]), matchAny("contentHash", [contentHash])] },
       with_payload: false,
       with_vector: false
     });
@@ -57,6 +60,7 @@ export class VectorStore {
       payload: {
         chunkId: chunk.chunkId,
         documentId: chunk.documentId,
+        userId: chunk.userId,
         contentHash: chunk.contentHash,
         platform: chunk.platform,
         documentType: chunk.documentType,
@@ -71,9 +75,9 @@ export class VectorStore {
     await this.client.upsert(this.collection, { points });
   }
 
-  async search(vector, filters = {}, limit = 6) {
+  async search(vector, filters = {}, limit = 6, userId) {
     await this.ensureCollection();
-    const filter = buildFilter(filters);
+    const filter = buildFilter(userId, filters);
     const result = await this.client.search(this.collection, {
       vector,
       limit,
@@ -87,15 +91,15 @@ export class VectorStore {
   }
 }
 
-export function buildFilter(filters = {}) {
-  const must = [];
+export function buildFilter(userId, filters = {}) {
+  const must = [matchAny("userId", [userId])];
   if (Array.isArray(filters.platform) && filters.platform.length) {
     must.push(matchAny("platform", filters.platform));
   }
   if (Array.isArray(filters.documentType) && filters.documentType.length) {
     must.push(matchAny("documentType", filters.documentType));
   }
-  return must.length ? { must } : undefined;
+  return { must };
 }
 
 function matchAny(key, values) {

@@ -6,7 +6,7 @@ import { createVectorStore } from "../vector/createVectorStore.js";
 const EMBEDDING_BATCH_SIZE = 64;
 const MAX_CONCURRENT_BATCHES = 3;
 
-export async function ingestFiles(files) {
+export async function ingestFiles(files, userId) {
   const embeddingProvider = createEmbeddingProvider();
   const vectorStore = createVectorStore({ dimension: embeddingProvider.dimension });
   const summary = {
@@ -31,9 +31,9 @@ export async function ingestFiles(files) {
     try {
       for await (const document of parser.parse(file)) {
         summary.documentsParsed += 1;
-        for (const chunk of chunkDocument(document)) {
+        for (const chunk of chunkDocument(document, userId)) {
           summary.chunksCreated += 1;
-          if (seenHashes.has(chunk.contentHash) || await vectorStore.hasContentHash(chunk.contentHash)) {
+          if (seenHashes.has(chunk.contentHash) || await vectorStore.hasContentHash(chunk.contentHash, userId)) {
             summary.chunksSkippedAsDuplicates += 1;
             continue;
           }
