@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { MessageSquare, Upload, Send, FileText, Library, ChevronLeft, ChevronRight, Moon, Paperclip, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Database, LogOut } from "lucide-react";
+import { MessageSquare, Upload, Send, FileText, Library, ChevronLeft, ChevronRight, Moon, Paperclip, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Database, LogOut, Github } from "lucide-react";
 import { Landing } from "./Landing.jsx";
 import "./styles.css";
 
@@ -92,22 +92,34 @@ function LeftSidebar({ collapsed, onCollapse, page, setPage, ingestion, user, on
 
       {/* User */}
       <div className={`flex items-center gap-2 px-3 py-3 border-t border-[#262628] ${collapsed ? "justify-center" : ""}`}>
-        {user?.avatarUrl ? (
-          <img src={user.avatarUrl} alt="" className="w-7 h-7 rounded-full flex-shrink-0" />
+        {user ? (
+          <>
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt="" className="w-7 h-7 rounded-full flex-shrink-0" />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-[#f97316] text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
+                {(user.name || user.login || "?")[0].toUpperCase()}
+              </div>
+            )}
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-medium text-[#f5f5f5] truncate">{user.name || user.login}</p>
+                <p className="text-[10px] text-[#4a4a4a] truncate">@{user.login}</p>
+              </div>
+            )}
+            {!collapsed && (
+              <button onClick={onLogout} className="text-[#4a4a4a] hover:text-[#f97316] bg-transparent border-none cursor-pointer p-0.5 flex-shrink-0" aria-label="Sign out">
+                <LogOut size={13} />
+              </button>
+            )}
+          </>
         ) : (
-          <div className="w-7 h-7 rounded-full bg-[#f97316] text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
-            {(user?.name || user?.login || "?")[0].toUpperCase()}
-          </div>
-        )}
-        {!collapsed && (
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-[#f5f5f5] truncate">{user?.name || user?.login}</p>
-            <p className="text-[10px] text-[#4a4a4a] truncate">@{user?.login}</p>
-          </div>
-        )}
-        {!collapsed && (
-          <button onClick={onLogout} className="text-[#4a4a4a] hover:text-[#f97316] bg-transparent border-none cursor-pointer p-0.5 flex-shrink-0" aria-label="Sign out">
-            <LogOut size={13} />
+          <button
+            onClick={() => { window.location.hash = "signin"; }}
+            className={`flex items-center gap-2 text-[12px] font-medium text-[#f5f5f5] hover:text-[#f97316] bg-transparent border-none cursor-pointer p-0 w-full ${collapsed ? "justify-center" : ""}`}
+          >
+            <Github size={18} className="flex-shrink-0" />
+            {!collapsed && <span>Sign in</span>}
           </button>
         )}
       </div>
@@ -615,6 +627,103 @@ function App({ user, onLogout }) {
   );
 }
 
+// ── Auth page (sign in / sign up) ────────────────────────────
+function AuthPage({ onAuthed }) {
+  const [mode, setMode] = useState("signin"); // signin | signup
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
+      const body = mode === "signup" ? { email, password, name } : { email, password };
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong");
+      onAuthed(data.user);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const inputClass = "w-full bg-[#141415] border border-[#262628] rounded-xl px-4 py-3 text-[14px] text-[#f5f5f5] placeholder-[#5a5a5a] outline-none focus:border-[#f97316] transition-colors";
+
+  return (
+    <div className="flex h-screen items-center justify-center bg-[#080809] px-4">
+      <div className="w-full max-w-sm">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <input
+            type="email" required placeholder="Email" value={email}
+            onChange={e => setEmail(e.target.value)} className={inputClass}
+          />
+          <input
+            type="password" required minLength={8} placeholder="Password" value={password}
+            onChange={e => setPassword(e.target.value)} className={inputClass}
+          />
+          {mode === "signup" && (
+            <input
+              type="text" placeholder="Name (optional)" value={name}
+              onChange={e => setName(e.target.value)} className={inputClass}
+            />
+          )}
+          {error && <p className="text-[12px] text-red-400">{error}</p>}
+          <button
+            type="submit" disabled={submitting}
+            className="w-full bg-[#f97316] hover:bg-[#ea6c0d] disabled:opacity-50 text-white text-[15px] font-semibold py-3 rounded-xl border-none cursor-pointer transition-colors shadow-[0_0_24px_rgba(249,115,22,0.35)]"
+          >
+            {submitting ? "Please wait…" : mode === "signup" ? "Sign up" : "Sign in"}
+          </button>
+        </form>
+
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-[#262628]" />
+          <span className="text-[12px] text-[#5a5a5a]">or</span>
+          <div className="flex-1 h-px bg-[#262628]" />
+        </div>
+
+        <a
+          href={`${API_BASE}/api/auth/github`}
+          className="flex items-center justify-center gap-2 w-full border border-[#262628] hover:border-[#f97316] text-[#f5f5f5] hover:text-[#f97316] text-[14px] font-medium py-3 rounded-xl no-underline transition-colors"
+        >
+          <Github size={16} /> Continue with GitHub
+        </a>
+
+        <p className="text-center text-[13px] text-[#9a9a9a] mt-6">
+          {mode === "signup" ? (
+            <>Already have an account?{" "}
+              <button type="button" onClick={() => setMode("signin")} className="text-[#f97316] bg-transparent border-none cursor-pointer p-0 font-medium">Sign in</button>
+            </>
+          ) : (
+            <>No account yet?{" "}
+              <button type="button" onClick={() => setMode("signup")} className="text-[#f97316] bg-transparent border-none cursor-pointer p-0 font-medium">Sign up</button>
+            </>
+          )}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => { window.location.hash = ""; }}
+          className="block mx-auto mt-5 text-[12px] text-[#5a5a5a] hover:text-[#f97316] bg-transparent border-none cursor-pointer transition-colors"
+        >
+          ← Back to home
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Root ──────────────────────────────────────────────────────
 function useSession() {
   const [status, setStatus] = useState("loading"); // loading | authed | anon
@@ -627,7 +736,7 @@ function useSession() {
       .catch(() => setStatus("anon"));
   }, []);
 
-  return { status, user, setStatus };
+  return { status, user, setStatus, setUser };
 }
 
 function Root() {
@@ -646,14 +755,17 @@ function Root() {
     window.location.hash = "";
   }
 
-  if (hash !== "#app") return <Landing session={session} onLogout={handleLogout} />;
-  if (session.status === "loading") return <div className="h-screen bg-[#080809]" />;
-  if (session.status === "anon") {
-    window.location.href = `${API_BASE}/api/auth/github`;
-    return <div className="h-screen bg-[#080809]" />;
+  function handleAuthed(user) {
+    session.setUser(user);
+    session.setStatus("authed");
+    window.location.hash = "app";
   }
 
-  return <App user={session.user} onLogout={handleLogout} />;
+  if (hash === "#signin") return <AuthPage onAuthed={handleAuthed} />;
+  if (hash !== "#app") return <Landing />;
+  if (session.status === "loading") return <div className="h-screen bg-[#080809]" />;
+
+  return <App user={session.status === "authed" ? session.user : null} onLogout={handleLogout} />;
 }
 
 // createRoot(document.getElementById("root")).render(<Landing />);
