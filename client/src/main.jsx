@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { MessageSquare, Upload, Send, FileText, Library, ChevronLeft, ChevronRight, Moon, Paperclip, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Database, LogOut, Github } from "lucide-react";
+import { MessageSquare, Send, ChevronLeft, ChevronRight, Paperclip, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Database, LogOut, Github } from "lucide-react";
 import { Landing } from "./Landing.jsx";
 import "./styles.css";
 
@@ -31,11 +31,9 @@ function PlatformIcon({ platform, size = 18 }) {
 }
 
 // ── Left sidebar ─────────────────────────────────────────────
-function LeftSidebar({ collapsed, onCollapse, page, setPage, ingestion, user, onLogout }) {
+function LeftSidebar({ collapsed, onCollapse, ingestion, user, onLogout }) {
   const navItems = [
-    { id: "chat",    label: "Chat",    Icon: MessageSquare },
-    { id: "import",  label: "Import",  Icon: Upload },
-    { id: "library", label: "Library", Icon: Library },
+    { id: "chat", label: "Chat", Icon: MessageSquare },
   ];
 
   return (
@@ -56,22 +54,15 @@ function LeftSidebar({ collapsed, onCollapse, page, setPage, ingestion, user, on
 
       {/* Nav */}
       <nav className="flex flex-col gap-0.5 p-2 flex-1">
-        {navItems.map(({ id, label, Icon }) => {
-          const active = page === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setPage(id)}
-              className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] cursor-pointer border-none w-full text-left transition-colors duration-150
-                ${active
-                  ? "bg-[#2d1200] text-[#f97316] font-medium"
-                  : "bg-transparent text-[#9a9a9a] hover:bg-[#1c1c1e] hover:text-[#f5f5f5]"}`}
-            >
-              <Icon size={16} className="flex-shrink-0" />
-              {!collapsed && <span>{label}</span>}
-            </button>
-          );
-        })}
+        {navItems.map(({ id, label, Icon }) => (
+          <div
+            key={id}
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] w-full bg-[#2d1200] text-[#f97316] font-medium"
+          >
+            <Icon size={16} className="flex-shrink-0" />
+            {!collapsed && <span>{label}</span>}
+          </div>
+        ))}
       </nav>
 
       {/* Knowledge base */}
@@ -243,8 +234,9 @@ function RightPanel({ citations, filters, setFilters }) {
 }
 
 // ── Chat main ─────────────────────────────────────────────────
-function ChatMain({ chat, asking, message, setMessage, onSend, userName }) {
+function ChatMain({ chat, asking, message, setMessage, onSend, userName, onFilesSelected, uploading }) {
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [expandedSources, setExpandedSources] = useState({});
 
   useEffect(() => {
@@ -340,7 +332,24 @@ function ChatMain({ chat, asking, message, setMessage, onSend, userName }) {
       {/* Composer */}
       <div className="px-6 pb-5 pt-3">
         <form onSubmit={onSend} className="flex items-center gap-3 border border-[#262628] bg-[#141415] rounded-xl px-4 py-2.5">
-          <button type="button" className="text-[#4a4a4a] hover:text-[#f97316] bg-transparent border-none cursor-pointer p-0 flex-shrink-0 transition-colors" aria-label="Attach file">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".csv,.json,.html,.pdf,.png,.jpg,.jpeg,.webp,.bmp"
+            className="hidden"
+            onChange={e => {
+              onFilesSelected(Array.from(e.target.files || []));
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="text-[#4a4a4a] hover:text-[#f97316] bg-transparent border-none cursor-pointer p-0 flex-shrink-0 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Attach file"
+          >
             <Paperclip size={16} />
           </button>
           <button type="button" className="text-[#4a4a4a] hover:text-[#f97316] bg-transparent border-none cursor-pointer p-0 flex-shrink-0 transition-colors" aria-label="Refresh">
@@ -366,168 +375,8 @@ function ChatMain({ chat, asking, message, setMessage, onSend, userName }) {
   );
 }
 
-// ── Import page ───────────────────────────────────────────────
-function ImportPage({ files, setFiles, ingestion, uploading, onIngest }) {
-  return (
-    <div className="flex-1 overflow-y-auto bg-[#080809] p-8">
-      <h2 className="text-[18px] font-semibold text-[#f5f5f5] mb-1">Import data</h2>
-      <p className="text-[13px] text-[#9a9a9a] mb-6">Upload your social media exports, PDFs, or images to build your knowledge base.</p>
-
-      <div className="max-w-lg">
-        <form onSubmit={onIngest}>
-          <label className="flex flex-col items-center justify-center gap-3 min-h-[140px] border border-dashed border-[#2a2a2a] rounded-xl bg-[#141415] text-[#9a9a9a] cursor-pointer hover:border-[#f97316] hover:text-[#f97316] transition-colors mb-4">
-            <input type="file" multiple accept=".csv,.json,.html,.pdf,.png,.jpg,.jpeg,.webp,.bmp" className="hidden" onChange={e => setFiles(Array.from(e.target.files || []))} />
-            <FileText size={28} />
-            <span className="text-[13px]">{files.length ? `${files.length} file${files.length > 1 ? "s" : ""} selected` : "Choose files (CSV, JSON, HTML, PDF, Images)"}</span>
-          </label>
-
-          <button
-            type="submit"
-            disabled={!files.length || uploading}
-            className="w-full flex items-center justify-center gap-2 bg-[#f97316] hover:bg-[#ea6c0d] text-white text-[14px] font-medium py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-colors border-none cursor-pointer"
-          >
-            <Upload size={16} />
-            {uploading ? "Importing…" : "Import files"}
-          </button>
-        </form>
-
-        {ingestion && (
-          <div className="mt-5">
-            {ingestion.error ? (
-              <div className="bg-red-950 border border-red-800 rounded-xl p-4 text-[13px] text-red-400">{ingestion.error}</div>
-            ) : (
-              <div className="bg-[#141415] border border-[#262628] rounded-xl overflow-hidden">
-                {[["Files received", ingestion.filesReceived], ["Documents parsed", ingestion.documentsParsed], ["Chunks created", ingestion.chunksCreated], ["Duplicates skipped", ingestion.chunksSkippedAsDuplicates], ["Chunks embedded", ingestion.chunksEmbedded]].map(([label, val]) => (
-                  <div key={label} className="flex justify-between items-center px-4 py-2.5 border-b border-[#262628] last:border-b-0">
-                    <span className="text-[13px] text-[#9a9a9a]">{label}</span>
-                    <span className="text-[13px] font-semibold text-[#f97316]">{val}</span>
-                  </div>
-                ))}
-                {ingestion.errors?.length > 0 && (
-                  <div className="px-4 py-2.5 text-[12px] text-amber-400 bg-amber-950">{ingestion.errors.length} file issue(s) reported.</div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Library page ──────────────────────────────────────────────
-function LibraryPage({ history }) {
-  const [expanded, setExpanded] = useState(null);
-
-  function dateLabel(iso) {
-    const d = new Date(iso);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    if (d.toDateString() === today.toDateString()) return "Today";
-    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-    return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  }
-
-  // group by date label
-  const groups = history.reduceRight((acc, entry) => {
-    const label = dateLabel(entry.createdAt);
-    if (!acc[label]) acc[label] = [];
-    acc[label].push(entry);
-    return acc;
-  }, {});
-
-  if (history.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[#080809]">
-        <Library size={36} className="mb-3 text-[#262628]" />
-        <p className="text-[14px] font-medium text-[#9a9a9a]">No chat history yet</p>
-        <p className="text-[12px] text-[#4a4a4a] mt-1">Your conversations will appear here.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto bg-[#080809] p-8">
-      <h2 className="text-[18px] font-semibold text-[#f5f5f5] mb-1">Library</h2>
-      <p className="text-[13px] text-[#4a4a4a] mb-7">Your chat history, organized by date.</p>
-
-      <div className="max-w-2xl flex flex-col gap-8">
-        {Object.entries(groups).map(([label, entries]) => (
-          <div key={label}>
-            <p className="text-[11px] font-semibold text-[#4a4a4a] uppercase tracking-widest mb-3">{label}</p>
-            <div className="flex flex-col gap-2">
-              {entries.map(entry => (
-                <div
-                  key={entry.id}
-                  className="border border-[#262628] rounded-xl overflow-hidden bg-[#0f0f10]"
-                >
-                  {/* question row */}
-                  <button
-                    onClick={() => setExpanded(e => e === entry.id ? null : entry.id)}
-                    className="w-full flex items-center justify-between px-4 py-3 text-left bg-transparent border-none cursor-pointer hover:bg-[#141415] transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <MessageSquare size={14} className="text-[#f97316] flex-shrink-0" />
-                      <span className="text-[13px] text-[#f5f5f5] truncate">{entry.question}</span>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                      <span className="text-[11px] text-[#4a4a4a]">
-                        {new Date(entry.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                      {entry.citations?.length > 0 && (
-                        <span className="text-[10px] bg-[#2d1200] text-[#f97316] px-1.5 py-0.5 rounded font-medium">
-                          {entry.citations.length} src
-                        </span>
-                      )}
-                      {expanded === entry.id ? <ChevronUp size={13} className="text-[#4a4a4a]" /> : <ChevronDown size={13} className="text-[#4a4a4a]" />}
-                    </div>
-                  </button>
-
-                  {/* expanded answer */}
-                  {expanded === entry.id && (
-                    <div className="px-4 pb-4 border-t border-[#262628]">
-                      <p className="text-[13px] text-[#9a9a9a] leading-relaxed pt-3">{entry.answer}</p>
-                      {entry.citations?.length > 0 && (
-                        <div className="flex flex-col gap-2 mt-3">
-                          {entry.citations.map(c => (
-                            <div key={c.id} className="flex items-start gap-2 bg-[#141415] border border-[#262628] rounded-lg px-3 py-2">
-                              <PlatformIcon platform={c.platform} size={14} />
-                              <div className="min-w-0">
-                                <p className="text-[11px] text-[#9a9a9a] capitalize">{c.platform} · {c.documentType}{c.createdAt ? ` · ${new Date(c.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}` : ""}</p>
-                                <p className="text-[12px] text-[#f5f5f5] mt-0.5 line-clamp-2">"{c.snippet}"</p>
-                                {c.url && <a href={c.url} target="_blank" rel="noreferrer" className="text-[11px] text-[#f97316] hover:underline flex items-center gap-0.5 mt-1">View <ExternalLink size={9} /></a>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Placeholder pages ─────────────────────────────────────────
-function PlaceholderPage({ icon: Icon, title }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center bg-[#080809] text-[#4a4a4a]">
-      <Icon size={36} className="mb-3 text-[#262628]" />
-      <p className="text-[14px] font-medium text-[#9a9a9a]">{title}</p>
-      <p className="text-[12px] mt-1">Coming soon</p>
-    </div>
-  );
-}
-
 // ── App ───────────────────────────────────────────────────────
 function App({ user, onLogout }) {
-  const [page, setPage] = useState("chat");
   const userName = user?.name?.split(" ")[0] || user?.login || "there";
 
   useEffect(() => {
@@ -539,7 +388,6 @@ function App({ user, onLogout }) {
     return () => window.removeEventListener("mousemove", onMouseMove);
   }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [files, setFiles] = useState([]);
   const [ingestion, setIngestion] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
@@ -547,23 +395,28 @@ function App({ user, onLogout }) {
   const [asking, setAsking] = useState(false);
   const [filters, setFilters] = useState({ platform: [], documentType: [] });
   const [lastCitations, setLastCitations] = useState([]);
-  const [history, setHistory] = useState([]);
 
-  async function handleIngest(e) {
-    e.preventDefault();
+  async function handleFilesSelected(files) {
     if (!files.length) return;
     setUploading(true);
     setIngestion(null);
     const formData = new FormData();
     files.forEach(f => formData.append("files", f));
+    const now = new Date().toISOString();
     try {
       const res = await fetch(`${API_BASE}/api/ingest`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ingestion failed");
       setIngestion(data);
-      setPage("chat");
+      setChat(c => [...c, {
+        role: "assistant",
+        content: `Ingested ${data.documentsParsed} document${data.documentsParsed === 1 ? "" : "s"}: ${data.chunksEmbedded} chunk${data.chunksEmbedded === 1 ? "" : "s"} embedded, ${data.chunksSkippedAsDuplicates} duplicate${data.chunksSkippedAsDuplicates === 1 ? "" : "s"} skipped.${data.errors?.length ? ` ${data.errors.length} file issue(s) reported.` : ""}`,
+        citations: [],
+        createdAt: now
+      }]);
     } catch (err) {
       setIngestion({ error: err.message });
+      setChat(c => [...c, { role: "assistant", content: `Import failed: ${err.message}`, citations: [], createdAt: now }]);
     } finally {
       setUploading(false);
     }
@@ -589,19 +442,12 @@ function App({ user, onLogout }) {
       setLastCitations(citations);
       const now = new Date().toISOString();
       setChat(c => [...c, { role: "assistant", content: data.answer, citations, createdAt: now }]);
-      setHistory(h => [...h, { id: `${Date.now()}`, question: trimmed, answer: data.answer, citations, createdAt: now }]);
     } catch (err) {
       setChat(c => [...c, { role: "assistant", content: err.message, citations: [], createdAt: new Date().toISOString() }]);
     } finally {
       setAsking(false);
     }
   }
-
-  const mainContent = () => {
-    if (page === "chat")      return <ChatMain chat={chat} asking={asking} message={message} setMessage={setMessage} onSend={handleSend} userName={userName} />;
-    if (page === "import")    return <ImportPage files={files} setFiles={setFiles} ingestion={ingestion} uploading={uploading} onIngest={handleIngest} />;
-    if (page === "library")   return <LibraryPage history={history} />;
-  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#080809] font-[Inter,ui-sans-serif,system-ui,sans-serif] relative">
@@ -613,14 +459,21 @@ function App({ user, onLogout }) {
       <LeftSidebar
         collapsed={sidebarCollapsed}
         onCollapse={() => setSidebarCollapsed(s => !s)}
-        page={page}
-        setPage={setPage}
         ingestion={ingestion}
         user={user}
         onLogout={onLogout}
       />
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {mainContent()}
+        <ChatMain
+          chat={chat}
+          asking={asking}
+          message={message}
+          setMessage={setMessage}
+          onSend={handleSend}
+          userName={userName}
+          onFilesSelected={handleFilesSelected}
+          uploading={uploading}
+        />
       </main>
       <RightPanel citations={lastCitations} filters={filters} setFilters={setFilters} />
     </div>
