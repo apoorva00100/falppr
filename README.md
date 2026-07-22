@@ -72,53 +72,6 @@ Browser (React SPA)
                (Qdrant / Memory)
 ```
 
----
-
-## Project Structure
-
-```
-falpper/
-├── package.json              # Monorepo root (npm workspaces)
-│
-├── client/
-│   └── src/
-│       ├── main.jsx          # App shell — Chat, Import, Library pages
-│       ├── Landing.jsx       # Landing page with cursor glow effect
-│       └── styles.css        # Tailwind + custom landing CSS
-│
-└── server/
-    └── src/
-        ├── server.js         # Express entry point
-        ├── config/
-        │   └── env.js        # Centralised environment config
-        ├── routes/
-        │   ├── healthRoutes.js
-        │   ├── ingestRoutes.js
-        │   └── chatRoutes.js
-        ├── parsers/
-        │   ├── parserRegistry.js   # Routes files to the right parser
-        │   ├── BaseParser.js
-        │   ├── LinkedInParser.js
-        │   ├── TwitterParser.js
-        │   ├── InstagramParser.js
-        │   └── parserUtils.js
-        ├── ingestion/
-        │   ├── ingestService.js    # Orchestrates the full pipeline
-        │   ├── chunker.js          # Semantic text splitting
-        │   └── hashing.js          # SHA256 content hashing
-        ├── embeddings/
-        │   ├── embeddingProvider.js        # Factory — picks provider from env
-        │   ├── openAIEmbeddingProvider.js
-        │   └── geminiEmbeddingProvider.js
-        ├── vector/
-        │   ├── createVectorStore.js   # Factory — qdrant or memory
-        │   ├── qdrantClient.js
-        │   └── localVectorStore.js
-        └── rag/
-            ├── retriever.js       # Embed query + vector search
-            ├── prompt.js          # Builds the context + question prompt
-            └── answerService.js   # Calls LLM, returns answer + citations
-```
 
 ---
 
