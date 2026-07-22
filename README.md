@@ -49,7 +49,8 @@ flowchart TD
 
 Live app: **[falppr-client.vercel.app](https://falppr-client.vercel.app)**
 
-_[Add screenshot/GIF here]_
+<img width="1880" height="966" alt="image" src="https://github.com/user-attachments/assets/09f356d5-5017-42da-9bf9-4116d4eb3f91" />
+
 
 ## V2 — Future Plans
 
